@@ -12,7 +12,7 @@ This repo is intentionally separate from application and host setup:
 
 ## Status
 
-**Early stage.** There is no firmware source in this repository yet. Backend stubs exist in `alona-os-core` (`AlonaIngest.Adapters.Esp32Adapter`, MQTT client/router placeholders). MQTT topic and payload contracts are not finalized (a dedicated `protocol` repo is planned in the wider workspace).
+**Early stage.** There is no firmware source in this repository yet. `alona-os-core` implements `Esp32Adapter` and a minimal MQTT subscriber for the configured living-room topic; the **on-device** topic/payload contract should still be treated as **not finalized** until firmware ships.
 
 ## Role in the stack
 
@@ -29,7 +29,7 @@ Design goals match the rest of the **alona-os system**: long uptime, fault isola
 | Piece | Location | Notes |
 |-------|----------|--------|
 | MQTT broker | **alona-os system** (Pi) — see **alona-os-infra** | Default listener **1883** (`mosquitto/alona.conf`) |
-| Ingest adapter | `alona-os-core/apps/alona_ingest` | `Esp32Adapter.normalize/1` — not implemented |
+| Ingest adapter | `alona-os-core/apps/alona_ingest` | `Esp32Adapter.normalize/1`; MQTT ingest via `Mqtt.Handler` → `TopicRouter` |
 | Measurement slugs | `alona-os-core` — `measurement_streams` | Stable slugs; UI reads via `Measurements.streams_for_slugs/1` |
 | Devices in DB | `devices` table | Optional `firmware_version`, `last_seen_at` for ops |
 
@@ -52,8 +52,8 @@ When implementing publish logic, align payloads with whatever **`Esp32Adapter`**
 | Module | Purpose |
 |--------|---------|
 | `AlonaIngest.Adapters.Esp32Adapter` | Normalize node JSON (or binary) payloads → measurement writes |
-| `AlonaIngest.Mqtt.TopicRouter` | Route topics to Victron vs ESP32 adapters |
-| `AlonaIngest.Mqtt.Client` | Broker connection (not started in release yet) |
+| `AlonaIngest.Mqtt.TopicRouter` | MVP: configured ESP32 topic(s) → `Esp32Adapter` (Victron path not wired) |
+| `AlonaIngest.Mqtt.Client` | Supervised `Tortoise311.Connection` (see `apps/alona_ingest/README.md`) |
 | `AlonaCore.Measurements.Device` | Device metadata including `firmware_version` |
 
 ## Security
