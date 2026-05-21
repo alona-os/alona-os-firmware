@@ -7,3 +7,7 @@
 
 gateway/main/alona_config.h
 examples/espnow_fake_node/main/alona_config.h
+examples/temp_humidity_node/main/alona_config.h
+
+# operator secrets + generated-from-manifest backup (single source: property.local.json)
+property.local.json

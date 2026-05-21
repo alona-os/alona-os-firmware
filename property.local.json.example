@@ -1,0 +1,30 @@
+{
+  "wifi": {
+    "ssid": "your-ssid",
+    "password": "your-password"
+  },
+  "mqtt": {
+    "host": "192.168.1.50",
+    "port": 1883,
+    "living_room_topic": "alona/esp32/living-room/telemetry"
+  },
+  "gateway": {
+    "device_id_label": "living-room-gateway",
+    "dedupe_window_ms": 2000,
+    "espnow_rx_queue_depth": 12
+  },
+  "espnow": {
+    "wifi_channel": 6,
+    "gateway_sta_mac": "00:00:00:00:00:00"
+  },
+  "nodes": {
+    "temp_humidity": {
+      "device_id": "living-room-node-01",
+      "send_interval_ms": 5000
+    },
+    "fake_bench": {
+      "device_id": "living-room-esp32",
+      "send_interval_ms": 10000
+    }
+  }
+}

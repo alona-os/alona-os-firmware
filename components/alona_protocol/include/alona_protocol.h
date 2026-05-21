@@ -50,6 +50,13 @@ typedef struct {
 alona_proto_err_t alona_espnow_v1_decode(const char *json, size_t len, alona_espnow_v1_frame_t *out);
 
 /**
+ * Build ESP-NOW v1 JSON per docs/esp32-espnow-v1.md (sensor node transmit path).
+ * Includes optional measured_at, battery_mv, rssi_dbm only when set on `frame`.
+ * Output length must not exceed ALONA_PROTO_ESPNOW_V1_MAX_BYTES (excluding terminator).
+ */
+alona_proto_err_t alona_espnow_v1_build(const alona_espnow_v1_frame_t *frame, char *buf, size_t buf_len);
+
+/**
  * Build MQTT v1 JSON per docs/esp32-mqtt-v1.md.
  * device_id is copied verbatim from `frame`.
  * If node did not send rssi_dbm, uses recv_rssi for top-level rssi_dbm when MQTT includes it.

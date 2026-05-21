@@ -126,6 +126,75 @@ static bool append_number_field(cJSON *obj, const char *key, float v) {
     return true;
 }
 
+alona_proto_err_t alona_espnow_v1_build(const alona_espnow_v1_frame_t *frame, char *buf, size_t buf_len) {
+    if (frame == NULL || buf == NULL || buf_len < ALONA_PROTO_ESPNOW_V1_MAX_BYTES + 1) {
+        return ALONA_PROTO_ERR_INVALID_JSON;
+    }
+
+    if (frame->device_id[0] == '\0') {
+        return ALONA_PROTO_ERR_DEVICE_ID;
+    }
+
+    if (!frame->has_temperature_c && !frame->has_relative_humidity_pct) {
+        return ALONA_PROTO_ERR_NO_MAPPABLE_READINGS;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        return ALONA_PROTO_ERR_INVALID_JSON;
+    }
+
+    cJSON_AddNumberToObject(root, "version", 1);
+    cJSON_AddStringToObject(root, "device_id", frame->device_id);
+
+    cJSON *readings = cJSON_CreateObject();
+    if (readings == NULL) {
+        cJSON_Delete(root);
+        return ALONA_PROTO_ERR_INVALID_JSON;
+    }
+
+    if (frame->has_temperature_c && !append_number_field(readings, "temperature_c", frame->temperature_c)) {
+        cJSON_Delete(readings);
+        cJSON_Delete(root);
+        return ALONA_PROTO_ERR_INVALID_JSON;
+    }
+    if (frame->has_relative_humidity_pct &&
+        !append_number_field(readings, "relative_humidity_pct", frame->relative_humidity_pct)) {
+        cJSON_Delete(readings);
+        cJSON_Delete(root);
+        return ALONA_PROTO_ERR_INVALID_JSON;
+    }
+
+    cJSON_AddItemToObject(root, "readings", readings);
+
+    if (frame->measured_at[0] != '\0') {
+        cJSON_AddStringToObject(root, "measured_at", frame->measured_at);
+    }
+
+    if (frame->has_battery_mv) {
+        cJSON_AddNumberToObject(root, "battery_mv", (double)frame->battery_mv);
+    }
+
+    if (frame->has_rssi_dbm_node) {
+        cJSON_AddNumberToObject(root, "rssi_dbm", (double)frame->rssi_dbm_node);
+    }
+
+    char *printed = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (printed == NULL) {
+        return ALONA_PROTO_ERR_INVALID_JSON;
+    }
+
+    size_t plen = strlen(printed);
+    if (plen > ALONA_PROTO_ESPNOW_V1_MAX_BYTES || plen + 1 > buf_len) {
+        cJSON_free(printed);
+        return ALONA_PROTO_ERR_TOO_LARGE;
+    }
+    memcpy(buf, printed, plen + 1);
+    cJSON_free(printed);
+    return ALONA_PROTO_OK;
+}
+
 alona_proto_err_t alona_mqtt_v1_build(const alona_espnow_v1_frame_t *frame, int8_t recv_rssi,
                                       char *buf, size_t buf_len) {
     if (frame == NULL || buf == NULL || buf_len < 64) {

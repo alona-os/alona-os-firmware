@@ -18,7 +18,7 @@ Production hardening (peer allowlists, encryption, MQTT QoS 1+, persistence) is 
 ## Hardware
 
 - **Gateway:** ESP32 family devkit (**ESP-IDF target `esp32c3`** for the reference gateway build — use `esp32` only if your gateway MCU is classic ESP32).
-- **Bench sender (optional):** second board running `examples/espnow_fake_node`; target match that board (`esp32` common for a classic ESP32 bench node).
+- **Bench sender (optional):** second board running **`examples/temp_humidity_node`** (preferred structured Living Room template; fake readings only; **ESP32-C3 Mini-1 → `idf.py set-target esp32c3`**) or **`examples/espnow_fake_node`** (minimal ramping bench sender); **`idf.py set-target`** must match that board’s SoC (`esp32` vs `esp32c3`).
 - USB cables for serial flash/monitor.
 - LAN access to a Mosquitto broker (Raspberry Pi from **alona-os-infra**, or local Mosquitto on a laptop).
 
@@ -27,11 +27,13 @@ Contracts (do not diverge without coordinated backend changes):
 - [`esp32-espnow-v1.md`](esp32-espnow-v1.md)
 - [`esp32-mqtt-v1.md`](esp32-mqtt-v1.md)
 
+**Single-file tuning:** [`property.local.json.example`](../property.local.json.example) + [`scripts/sync_property_manifest.py`](../scripts/sync_property_manifest.py) regenerate all firmware `alona_config.h` files — see [`scripts/README-property-manifest.md`](../scripts/README-property-manifest.md).
+
 ## Prerequisites
 
 - **ESP-IDF v5.1+** installed and environment sourced (`IDF_PATH`, `idf.py` on `PATH`).
 - Wi-Fi credentials for the gateway station interface.
-- Mosquitto (or compatible broker) reachable from the **gateway’s Wi‑Fi** — see **[Run Mosquitto](#run-mosquitto-plaintext-mqtt)**. Set **`ALONA_MQTT_HOST`** / **`ALONA_MQTT_PORT`** (default **1883**) in [`gateway/main/alona_config.h`](../gateway/main/alona_config.h.example) after copying the example file.
+- Mosquitto (or compatible broker) reachable from the **gateway’s Wi‑Fi** — see **[Run Mosquitto](#run-mosquitto-plaintext-mqtt)**. Set gateway Wi‑Fi + MQTT via [`property.local.json`](../property.local.json.example) + [`scripts/sync_property_manifest.py`](../scripts/sync_property_manifest.py), or manually in [`gateway/main/alona_config.h`](../gateway/main/alona_config.h.example) after copying the example file.
 
 ## Run Mosquitto (plaintext MQTT)
 
@@ -98,8 +100,8 @@ On macOS, serial ports often look like `/dev/cu.usbserial-*` or `/dev/cu.usbmode
 
 - Boot banner with gateway label (`ALONA_GATEWAY_DEVICE_ID` is **not** sent on MQTT).
 - **Wi-Fi** connected / disconnected.
-- **Wi-Fi channel** after association — needed for the fake node.
-- **Gateway STA MAC** — give this to the fake node as the ESP-NOW peer.
+- **Wi-Fi channel** after association — needed for ESP-NOW sender boards (fake node / temp_humidity_node).
+- **Gateway STA MAC** — give this to ESP-NOW sender firmware as the peer address.
 - **ESP-NOW** receive lines (length, RSSI, peer MAC).
 - Decoded readings summary and MQTT publish success/failure.
 
@@ -117,6 +119,23 @@ idf.py set-target esp32   # match sender chip (often classic ESP32; use esp32c3 
 idf.py build
 idf.py -p /dev/ttyOTHER flash monitor
 ```
+
+## Configure temp/humidity sensor node (structured template)
+
+Same radio rules as the bench fake node: **no** `esp_wifi_connect()`, fixed **`esp_wifi_set_channel()`**, gateway STA MAC as ESP-NOW peer.
+
+Use **`examples/temp_humidity_node`** when you want the Living Room shape (`device_id` **`living-room-node-01`** default), **5 s** cadence, and JSON built via **`alona_espnow_v1_build()`** (shared `alona_protocol`). This revision sends **fake** temperature/RH only — no sensor driver, no deep sleep.
+
+```bash
+cd examples/temp_humidity_node
+cp main/alona_config.h.example main/alona_config.h
+# set ALONA_WIFI_CHANNEL and ALONA_GATEWAY_PEER_MAC_B0..B5 from gateway logs
+idf.py set-target esp32c3   # ESP32-C3 Mini-1 and other C3; use esp32 only for classic ESP32
+idf.py build
+idf.py -p /dev/ttyOTHER flash monitor
+```
+
+Full operator notes: [`examples/temp_humidity_node/README.md`](../examples/temp_humidity_node/README.md).
 
 ## Verify MQTT on the broker
 
@@ -149,7 +168,7 @@ See [`../alona-os-core/apps/alona_ingest/README.md`](../../alona-os-core/apps/al
 
 | Symptom | Things to check |
 |--------|-------------------|
-| No ESP-NOW on gateway | Fake node **channel** matches gateway AP channel; peer MAC matches gateway **STA** MAC; both boards powered; antennas |
+| No ESP-NOW on gateway | Sender **channel** matches gateway AP channel; peer MAC matches gateway **STA** MAC; both boards powered; antennas |
 | Gateway MQTT errors / **`Connection reset by peer`** (`esp-tls`, transport connect) | **Wrong `ALONA_MQTT_HOST`** (never `127.0.0.1`); broker not reachable on LAN; **`listener`** bound only to **`127.0.0.1`** — use **`listener 1883 0.0.0.0`**; firewall; TLS-only broker (firmware expects plain **`mqtt://`** on **1883**) |
 | Gateway MQTT never connects | Broker IP/port; firewall; anonymous MQTT allowed on LAN (default infra) |
 | `mqtt not connected, skip publish` | Wait for Wi-Fi + MQTT; gateway logs MQTT events |

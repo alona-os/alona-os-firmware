@@ -1,0 +1,21 @@
+/**
+ * copy this file to alona_config.h (gitignored) and set gateway MAC + channel.
+ * ESP32-C3 Mini-1: idf.py set-target esp32c3
+ */
+#pragma once
+
+/** must match gateway Wi-Fi AP channel (see gateway serial log after Wi-Fi connects) */
+#define ALONA_WIFI_CHANNEL 6
+
+/** logical node id — forwarded verbatim by gateway on MQTT */
+#define ALONA_DEVICE_ID "living-room-node-01"
+
+#define ALONA_ESPNOW_SEND_INTERVAL_MS 5000
+
+/** gateway STA MAC bytes (from gateway serial: "gateway sta mac") */
+#define ALONA_GATEWAY_PEER_MAC_B0 0x00
+#define ALONA_GATEWAY_PEER_MAC_B1 0x00
+#define ALONA_GATEWAY_PEER_MAC_B2 0x00
+#define ALONA_GATEWAY_PEER_MAC_B3 0x00
+#define ALONA_GATEWAY_PEER_MAC_B4 0x00
+#define ALONA_GATEWAY_PEER_MAC_B5 0x00

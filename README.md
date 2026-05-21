@@ -24,7 +24,9 @@ This repo is separate from application and host setup:
 | Shared JSON helpers (ESP-NOW v1 decode → MQTT v1 build) | [`components/alona_protocol/`](components/alona_protocol/) |
 | Gateway (Wi-Fi STA + MQTT + ESP-NOW → queue → worker) | [`gateway/`](gateway/) |
 | Bench fake node (fixed channel, **no** Wi-Fi association) | [`examples/espnow_fake_node/`](examples/espnow_fake_node/) |
+| Temp/humidity node (structured; fake readings via `read_temperature_humidity()`, **`alona_espnow_v1_build()`**) | [`examples/temp_humidity_node/`](examples/temp_humidity_node/) |
 | Operator guide (hardware, channel/MAC, verify) | [`docs/gateway-setup.md`](docs/gateway-setup.md) |
+| **Property manifest** (Wi‑Fi / MQTT / ESP‑NOW → generated `alona_config.h`) | [`property.local.json.example`](property.local.json.example), [`scripts/README-property-manifest.md`](scripts/README-property-manifest.md) |
 
 Wire contracts (locked for MVP):
 
@@ -35,7 +37,7 @@ Wire contracts (locked for MVP):
 
 **Transport honesty:** ESP-NOW + MQTT QoS 0 here are **best-effort MVP** only — not a reliable delivery protocol. See [`docs/gateway-setup.md`](docs/gateway-setup.md).
 
-Production sensor firmware (real sensors, pairing, power management) is **not** this milestone; the fake node exists for bench testing only.
+Production sensor firmware (real sensors, pairing, power management) is **not** shipped yet; **`examples/temp_humidity_node`** sends fake temp/RH only (no sensor driver, no deep sleep); **`examples/espnow_fake_node`** remains a minimal ramping bench sender.
 
 ## Prerequisites
 
@@ -47,6 +49,20 @@ Production sensor firmware (real sensors, pairing, power management) is **not** 
 Install the toolchains you need — e.g. **`esp32c3` for the gateway** and **`esp32` for a classic ESP32 bench sender** (`./install.sh esp32c3` then `./install.sh esp32`, or `./install.sh esp32,esp32c3`).
 
 If flashing fails with *“This chip is ESP32-C3, not ESP32”* (or the reverse), delete that project’s `build/`, remove stale `sdkconfig`, and run `set-target` for the correct SoC again.
+
+## Property manifest — single source for firmware tuning
+
+Keep **Wi‑Fi**, **MQTT**, and shared **ESP‑NOW** settings (`wifi_channel`, `gateway_sta_mac`) in **one gitignored file**: **`property.local.json`** at this repo root (copy from [`property.local.json.example`](property.local.json.example)), then run:
+
+```bash
+python3 scripts/sync_property_manifest.py
+```
+
+That regenerates **`gateway/main/alona_config.h`**, **`examples/temp_humidity_node/main/alona_config.h`**, and **`examples/espnow_fake_node/main/alona_config.h`** so every firmware image stays aligned. Full field reference: [`scripts/README-property-manifest.md`](scripts/README-property-manifest.md).
+
+Pi / Phoenix MQTT env vars are **not** written automatically — the script prints matching **`export ALONA_MQTT_*`** lines for **`alona-os-core`** / **`alona-os-infra`** (`localhost` vs LAN IP differs by machine).
+
+You can still maintain headers manually from each `*.example` file if you prefer.
 
 ## Quick start — gateway
 
@@ -85,6 +101,20 @@ cp main/alona_config.h.example main/alona_config.h
 # set ALONA_GATEWAY_PEER_MAC_B0..B5 to gateway STA MAC
 
 idf.py set-target esp32   # must match **this sender** chip (often a classic ESP32 on the bench; use esp32c3 if your fake node board is C3)
+idf.py build
+idf.py -p /dev/ttyOTHER flash monitor
+```
+
+## Quick start — temp/humidity node (Living Room template)
+
+Structured node firmware — fake fixed temp/RH every **5 s**, payloads built with **`alona_espnow_v1_build()`**. See **[`examples/temp_humidity_node/README.md`](examples/temp_humidity_node/README.md)**.
+
+```bash
+cd examples/temp_humidity_node
+cp main/alona_config.h.example main/alona_config.h
+# set ALONA_WIFI_CHANNEL and ALONA_GATEWAY_PEER_MAC_B0..B5 from gateway logs
+
+idf.py set-target esp32c3   # ESP32-C3 Mini-1 and other C3 boards; use esp32 only for classic ESP32
 idf.py build
 idf.py -p /dev/ttyOTHER flash monitor
 ```
