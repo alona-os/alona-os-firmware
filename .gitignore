@@ -1,0 +1,9 @@
+# Local build outputs + secrets
+**/build/
+**/sdkconfig
+**/sdkconfig.old
+**/dependencies.lock
+**/managed_components/
+
+gateway/main/alona_config.h
+examples/espnow_fake_node/main/alona_config.h

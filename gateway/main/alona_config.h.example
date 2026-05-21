@@ -1,0 +1,20 @@
+/**
+ * copy this file to alona_config.h and edit (alona_config.h is gitignored).
+ */
+#pragma once
+
+#define ALONA_WIFI_SSID "your-ssid"
+#define ALONA_WIFI_PASSWORD "your-password"
+
+#define ALONA_MQTT_HOST "192.168.1.50"
+#define ALONA_MQTT_PORT 1883
+#define ALONA_MQTT_TOPIC "alona/esp32/living-room/telemetry"
+
+/** serial/log label only — never sent on MQTT */
+#define ALONA_GATEWAY_DEVICE_ID "living-room-gateway"
+
+/** dedupe window for duplicate (device_id, measured_at) ESP-NOW frames (ms) */
+#define ALONA_DEDUPE_WINDOW_MS 2000
+
+/** depth of ESP-NOW RX queue (frames dropped when full) */
+#define ALONA_ESPNOW_RX_QUEUE_DEPTH 12

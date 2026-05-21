@@ -1,0 +1,20 @@
+/**
+ * copy this file to alona_config.h (gitignored) and set gateway MAC + channel.
+ */
+#pragma once
+
+/** must match gateway Wi-Fi AP channel (see gateway serial log after Wi-Fi connects) */
+#define ALONA_WIFI_CHANNEL 6
+
+/** logical node id — forwarded verbatim by gateway on MQTT */
+#define ALONA_DEFAULT_DEVICE_ID "living-room-esp32"
+
+#define ALONA_ESPNOW_SEND_INTERVAL_MS 10000
+
+/** gateway STA MAC bytes (from gateway serial: "gateway sta mac") */
+#define ALONA_GATEWAY_PEER_MAC_B0 0x00
+#define ALONA_GATEWAY_PEER_MAC_B1 0x00
+#define ALONA_GATEWAY_PEER_MAC_B2 0x00
+#define ALONA_GATEWAY_PEER_MAC_B3 0x00
+#define ALONA_GATEWAY_PEER_MAC_B4 0x00
+#define ALONA_GATEWAY_PEER_MAC_B5 0x00

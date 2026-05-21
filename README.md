@@ -11,20 +11,77 @@ This repo is separate from application and host setup:
 
 | Repo | Role |
 |------|------|
-| **alona-os-firmware** (this repo) | ESP32 node + gateway firmware — sensors, ESP-NOW, MQTT bridge, OTA (planned) |
+| **alona-os-firmware** (this repo) | ESP32 node + gateway firmware — ESP-NOW, MQTT bridge (OTA planned) |
 | **alona-os-core** | Elixir umbrella — Postgres, LiveView UI, `alona_ingest` adapters |
 | **alona-os-infra** | Pi bootstrap — PostgreSQL, Mosquitto, env templates, systemd |
 
 ## Status
 
-**Early stage.** No firmware source in this repository yet. Wire contracts are documented and locked for the Living Room MVP:
+**Living Room MVP — gateway-first (ESP-IDF).**
+
+| Piece | Location |
+|-------|-----------|
+| Shared JSON helpers (ESP-NOW v1 decode → MQTT v1 build) | [`components/alona_protocol/`](components/alona_protocol/) |
+| Gateway (Wi-Fi STA + MQTT + ESP-NOW → queue → worker) | [`gateway/`](gateway/) |
+| Bench fake node (fixed channel, **no** Wi-Fi association) | [`examples/espnow_fake_node/`](examples/espnow_fake_node/) |
+| Operator guide (hardware, channel/MAC, verify) | [`docs/gateway-setup.md`](docs/gateway-setup.md) |
+
+Wire contracts (locked for MVP):
 
 | Doc | Hop |
 |-----|-----|
 | [`docs/esp32-espnow-v1.md`](docs/esp32-espnow-v1.md) | Sensor node → gateway (ESP-NOW) |
 | [`docs/esp32-mqtt-v1.md`](docs/esp32-mqtt-v1.md) | Gateway → Pi (MQTT JSON v1) |
 
-Backend ingest already accepts MQTT v1 on the configured topic via `Esp32Adapter`.
+**Transport honesty:** ESP-NOW + MQTT QoS 0 here are **best-effort MVP** only — not a reliable delivery protocol. See [`docs/gateway-setup.md`](docs/gateway-setup.md).
+
+Production sensor firmware (real sensors, pairing, power management) is **not** this milestone; the fake node exists for bench testing only.
+
+## Prerequisites
+
+- **ESP-IDF v5.1+** (`idf.py`, `IDF_PATH`)
+- Target **esp32** (`idf.py set-target esp32`)
+
+## Quick start — gateway
+
+```bash
+cd gateway
+cp main/alona_config.h.example main/alona_config.h
+# edit Wi-Fi SSID/password, MQTT host/port/topic
+
+idf.py set-target esp32
+idf.py build
+idf.py -p /dev/ttyUSB0 flash monitor
+```
+
+On macOS, serial ports are often `/dev/cu.usbserial-*` or `/dev/cu.usbmodem*`.
+
+Gateway logs print **STA MAC** and **Wi-Fi channel** after connect — required for the bench fake node.
+
+## Quick start — bench fake node
+
+See [`docs/gateway-setup.md`](docs/gateway-setup.md). Summary:
+
+```bash
+cd examples/espnow_fake_node
+cp main/alona_config.h.example main/alona_config.h
+# set ALONA_WIFI_CHANNEL to match gateway AP channel
+# set ALONA_GATEWAY_PEER_MAC_B0..B5 to gateway STA MAC
+
+idf.py set-target esp32
+idf.py build
+idf.py -p /dev/ttyOTHER flash monitor
+```
+
+## Verify MQTT
+
+```bash
+mosquitto_sub -h <broker-host> -p 1883 -t 'alona/esp32/living-room/telemetry' -v
+```
+
+## Verify with `alona-os-core`
+
+From the sibling umbrella repo: seeded DB + `mix phx.server` with MQTT pointed at the same broker. Details: `alona-os-core/apps/alona_ingest/README.md`.
 
 ## Role in the stack
 
@@ -34,7 +91,7 @@ Sensor node(s)  --ESP-NOW-->  Gateway ESP32  --MQTT-->  Mosquitto (Pi)  -->  alo
 Cerbo GX (Victron) ---------------------------------|
 ```
 
-Design goals: long uptime, fault isolation, low maintenance. Nodes stay off Wi-Fi/MQTT; gateways handle broker reconnect. Firmware must not couple to UI or database details — only the documented wire contracts matter.
+Design goals: long uptime, fault isolation, low maintenance. Nodes stay off Wi-Fi/MQTT; gateways handle broker reconnect. Firmware stays aligned with the wire docs — not with UI or DB layout.
 
 ## Broker and ingest (gateway)
 
@@ -42,20 +99,10 @@ Design goals: long uptime, fault isolation, low maintenance. Nodes stay off Wi-F
 |-------|----------|--------|
 | MQTT broker | Pi — **alona-os-infra** | Default listener **1883** (`mosquitto/alona.conf`) |
 | Ingest adapter | `alona-os-core/apps/alona_ingest` | `Esp32Adapter.normalize/1`; MQTT via `Mqtt.Handler` → `TopicRouter` |
-| Measurement slugs | `alona-os-core` — `measurement_streams` | Stable slugs; UI reads via `Measurements.streams_for_slugs/1` |
+| Measurement slugs | `alona-os-core` — `measurement_streams` | Living Room env: `env_living_temp_c`, `env_living_rh` |
 | Devices in DB | `devices` table | Optional `firmware_version`, `last_seen_at` for ops |
 
-Gateway broker URL: `ALONA_MQTT_HOST` / `ALONA_MQTT_PORT` in `/etc/alona/alona.env` (see **alona-os-infra**). Point gateways at the Pi LAN address on port **1883** unless you add TLS/auth.
-
 Cerbo GX uses Venus MQTT and **`VictronAdapter`**; ESP32 gateways use a separate adapter path.
-
-## Development (when firmware lands)
-
-1. **Local dev** — `alona-os-core`: `./setup.sh`, `mix phx.server` (seeds supply demo measurements; MQTT not required for UI work).
-2. **MQTT on laptop** — run Mosquitto locally or set `ALONA_MQTT_*` when testing gateway → ingest.
-3. **Pi host** — **alona-os-infra** `scripts/setup-pi.sh` for Postgres + Mosquitto.
-
-Implement nodes against **ESP-NOW v1**, gateways against **MQTT v1**; runtime behavior matches **`Esp32Adapter.normalize/1`**.
 
 ## Related code (core)
 
