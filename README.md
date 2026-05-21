@@ -40,7 +40,13 @@ Production sensor firmware (real sensors, pairing, power management) is **not** 
 ## Prerequisites
 
 - **ESP-IDF v5.1+** (`idf.py`, `IDF_PATH`)
-- Target **esp32** (`idf.py set-target esp32`)
+- Chip target must match **each** board you flash (`idf.py set-target …`):
+  - **`esp32`** — classic ESP32 (Xtensa). Toolchain: `./install.sh esp32`
+  - **`esp32c3`** — ESP32-C3 (RISC-V). Toolchain: `./install.sh esp32c3`
+
+Install the toolchains you need — e.g. **`esp32c3` for the gateway** and **`esp32` for a classic ESP32 bench sender** (`./install.sh esp32c3` then `./install.sh esp32`, or `./install.sh esp32,esp32c3`).
+
+If flashing fails with *“This chip is ESP32-C3, not ESP32”* (or the reverse), delete that project’s `build/`, remove stale `sdkconfig`, and run `set-target` for the correct SoC again.
 
 ## Quick start — gateway
 
@@ -49,7 +55,7 @@ cd gateway
 cp main/alona_config.h.example main/alona_config.h
 # edit Wi-Fi SSID/password, MQTT host/port/topic
 
-idf.py set-target esp32
+idf.py set-target esp32c3   # gateway reference build is ESP32-C3; only use esp32 here if your gateway silicon is classic ESP32
 idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
@@ -68,7 +74,7 @@ cp main/alona_config.h.example main/alona_config.h
 # set ALONA_WIFI_CHANNEL to match gateway AP channel
 # set ALONA_GATEWAY_PEER_MAC_B0..B5 to gateway STA MAC
 
-idf.py set-target esp32
+idf.py set-target esp32   # must match **this sender** chip (often a classic ESP32 on the bench; use esp32c3 if your fake node board is C3)
 idf.py build
 idf.py -p /dev/ttyOTHER flash monitor
 ```
