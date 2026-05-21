@@ -17,8 +17,8 @@ Production hardening (peer allowlists, encryption, MQTT QoS 1+, persistence) is 
 
 ## Hardware
 
-- **Gateway:** ESP32 devkit (ESP-IDF target `esp32`).
-- **Bench sender (optional):** second ESP32 running `examples/espnow_fake_node`.
+- **Gateway:** ESP32 family devkit (**ESP-IDF target `esp32c3`** for the reference gateway build — use `esp32` only if your gateway MCU is classic ESP32).
+- **Bench sender (optional):** second board running `examples/espnow_fake_node`; target match that board (`esp32` common for a classic ESP32 bench node).
 - USB cables for serial flash/monitor.
 - LAN access to a Mosquitto broker (Raspberry Pi from **alona-os-infra**, or local Mosquitto on a laptop).
 
@@ -31,20 +31,63 @@ Contracts (do not diverge without coordinated backend changes):
 
 - **ESP-IDF v5.1+** installed and environment sourced (`IDF_PATH`, `idf.py` on `PATH`).
 - Wi-Fi credentials for the gateway station interface.
-- MQTT broker reachable at `ALONA_MQTT_HOST`:`ALONA_MQTT_PORT` (default dev: `1883`).
+- Mosquitto (or compatible broker) reachable from the **gateway’s Wi‑Fi** — see **[Run Mosquitto](#run-mosquitto-plaintext-mqtt)**. Set **`ALONA_MQTT_HOST`** / **`ALONA_MQTT_PORT`** (default **1883**) in [`gateway/main/alona_config.h`](../gateway/main/alona_config.h.example) after copying the example file.
+
+## Run Mosquitto (plaintext MQTT)
+
+Gateways use **`mqtt://` only** — no TLS in this MVP firmware.
+
+### LAN IP (`ALONA_MQTT_HOST`)
+
+Use the IPv4 address of the machine running Mosquitto **as seen from other Wi‑Fi clients** (often `192.168.x.x`).
+
+- Never use **`127.0.0.1`** or **`localhost`** in `alona_config.h` — that would point the ESP at itself.
+
+### Listener must bind to LAN (not only loopback)
+
+If Mosquitto listens only on **`127.0.0.1`**, nothing accepts MQTT on **`192.168.x.x:1883`**. The gateway may log **`delayed connect error: Connection reset by peer`**, MQTT transport failures, then disconnect.
+
+Use a **`listener`** on all interfaces (**LAN only**, dev convenience):
+
+```conf
+listener 1883 0.0.0.0
+allow_anonymous true
+```
+
+### macOS (Homebrew)
+
+1. **`brew install mosquitto`** (if needed).
+
+2. Edit **`/opt/homebrew/etc/mosquitto/mosquitto.conf`** (install prefix may vary; **`brew --prefix mosquitto`** shows it).
+
+3. Replace **`listener 1883 127.0.0.1`** (default) with **`listener 1883 0.0.0.0`** and keep **`allow_anonymous true`** for local dev.
+
+4. **`brew services restart mosquitto`**
+
+5. Wi‑Fi IP (example): **`ipconfig getifaddr en0`** → put that value in **`ALONA_MQTT_HOST`**.
+
+6. Test subscription (use a concrete topic first; **`#`** alone can error on some CLI builds):
+
+```bash
+mosquitto_sub -h 192.168.1.REPLACE_ME -p 1883 -t test -v
+```
+
+### Raspberry Pi
+
+Match **alona-os-infra** Mosquitto setup; confirm the listener accepts connections from LAN clients, not only loopback.
 
 ## Configure gateway
 
 ```bash
 cd gateway
 cp main/alona_config.h.example main/alona_config.h
-# edit main/alona_config.h — SSID, password, MQTT host/port/topic
+# edit SSID/password; ALONA_MQTT_HOST = Mosquitto machine LAN IP (not 127.0.0.1); port usually 1883
 ```
 
 Build / flash / monitor:
 
 ```bash
-idf.py set-target esp32
+idf.py set-target esp32c3   # gateway reference is ESP32-C3; use esp32 for a classic ESP32 gateway
 idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
@@ -70,7 +113,7 @@ You **must** set `ALONA_WIFI_CHANNEL` to match the **gateway’s Wi-Fi channel**
 cd examples/espnow_fake_node
 cp main/alona_config.h.example main/alona_config.h
 # set ALONA_WIFI_CHANNEL and ALONA_GATEWAY_PEER_MAC_B0..B5 from gateway logs
-idf.py set-target esp32
+idf.py set-target esp32   # match sender chip (often classic ESP32; use esp32c3 if sender is C3)
 idf.py build
 idf.py -p /dev/ttyOTHER flash monitor
 ```
@@ -80,7 +123,7 @@ idf.py -p /dev/ttyOTHER flash monitor
 On any machine that reaches the broker:
 
 ```bash
-mosquitto_sub -h <broker-host> -p 1883 -t 'alona/esp32/living-room/telemetry' -v
+mosquitto_sub -h <broker-LAN-ip> -p 1883 -t 'alona/esp32/living-room/telemetry' -v
 ```
 
 You should see JSON like:
@@ -107,6 +150,7 @@ See [`../alona-os-core/apps/alona_ingest/README.md`](../../alona-os-core/apps/al
 | Symptom | Things to check |
 |--------|-------------------|
 | No ESP-NOW on gateway | Fake node **channel** matches gateway AP channel; peer MAC matches gateway **STA** MAC; both boards powered; antennas |
+| Gateway MQTT errors / **`Connection reset by peer`** (`esp-tls`, transport connect) | **Wrong `ALONA_MQTT_HOST`** (never `127.0.0.1`); broker not reachable on LAN; **`listener`** bound only to **`127.0.0.1`** — use **`listener 1883 0.0.0.0`**; firewall; TLS-only broker (firmware expects plain **`mqtt://`** on **1883**) |
 | Gateway MQTT never connects | Broker IP/port; firewall; anonymous MQTT allowed on LAN (default infra) |
 | `mqtt not connected, skip publish` | Wait for Wi-Fi + MQTT; gateway logs MQTT events |
 | `rx queue full` | Bursty traffic — increase `ALONA_ESPNOW_RX_QUEUE_DEPTH` or slow senders |

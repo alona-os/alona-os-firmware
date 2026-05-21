@@ -54,6 +54,7 @@ If flashing fails with *“This chip is ESP32-C3, not ESP32”* (or the reverse)
 cd gateway
 cp main/alona_config.h.example main/alona_config.h
 # edit Wi-Fi SSID/password, MQTT host/port/topic
+# ALONA_MQTT_HOST = LAN IP of the machine running Mosquitto (see "MQTT broker" below), not 127.0.0.1
 
 idf.py set-target esp32c3   # gateway reference build is ESP32-C3; only use esp32 here if your gateway silicon is classic ESP32
 idf.py build
@@ -63,6 +64,15 @@ idf.py -p /dev/ttyUSB0 flash monitor
 On macOS, serial ports are often `/dev/cu.usbserial-*` or `/dev/cu.usbmodem*`.
 
 Gateway logs print **STA MAC** and **Wi-Fi channel** after connect — required for the bench fake node.
+
+## MQTT broker (dev)
+
+Firmware uses **`mqtt://`** (plaintext on port **1883**).
+
+- **`ALONA_MQTT_HOST`** must be reachable from Wi‑Fi: the broker machine’s **LAN IPv4** (e.g. `192.168.1.100`). **Do not use `localhost` / `127.0.0.1`** — that is wrong for another device on the network.
+- The broker must **listen on the LAN**, not loopback-only. Example (macOS Homebrew): if `/opt/homebrew/etc/mosquitto/mosquitto.conf` has `listener 1883 127.0.0.1`, change to **`listener 1883 0.0.0.0`** and `brew services restart mosquitto`.
+
+More detail and pitfalls: **[`docs/gateway-setup.md`](docs/gateway-setup.md)** (“Run Mosquitto”, troubleshooting).
 
 ## Quick start — bench fake node
 
@@ -81,8 +91,10 @@ idf.py -p /dev/ttyOTHER flash monitor
 
 ## Verify MQTT
 
+Use your broker’s LAN IP (`ipconfig getifaddr en0` on Mac Wi‑Fi, etc.):
+
 ```bash
-mosquitto_sub -h <broker-host> -p 1883 -t 'alona/esp32/living-room/telemetry' -v
+mosquitto_sub -h <broker-LAN-ip> -p 1883 -t 'alona/esp32/living-room/telemetry' -v
 ```
 
 ## Verify with `alona-os-core`
